@@ -203,8 +203,8 @@ fn spawn_food_event_listener(
     for _ in spawn_food_events.iter() {
         let mut rng = rand::thread_rng();
         let window = windows.get_primary().unwrap();
-        let food_x = rng.gen_range(FOOD_OFFSET_X, window.width() - FOOD_OFFSET_X);
-        let food_y = rng.gen_range(FOOD_OFFSET_Y, window.height() - FOOD_OFFSET_Y);
+        let food_x = rng.gen_range(FOOD_OFFSET_X..window.width() - FOOD_OFFSET_X);
+        let food_y = rng.gen_range(FOOD_OFFSET_Y..window.height() - FOOD_OFFSET_Y);
 
         commands
             .spawn(SpriteBundle {
