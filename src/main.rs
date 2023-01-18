@@ -16,10 +16,14 @@ struct Background;
 #[derive(Default, Resource, Deref, DerefMut)]
 struct SnakeSegments(Vec<Entity>);
 
-#[derive(Component)]
+#[derive(Default, Resource, Deref, DerefMut)]
+struct GameState {
+    speed: f32,
+}
+
+#[derive(Default, Component)]
 struct SnakeMovement {
     direction: Vec2,
-    speed: f32,
 }
 
 #[derive(Default)]
@@ -28,7 +32,8 @@ struct SpawnFood;
 #[derive(Default)]
 struct FoodEaten;
 
-const STARTUP_FOOD_AMOUNT: i32 = 20;
+const STARTUP_FOOD_AMOUNT: i32 = 50;
+const SNAKE_EAT_SELF_DISTANCE: f32 = 10.0;
 const FOOD_OFFSET_X: f32 = 20.0;
 const FOOD_OFFSET_Y: f32 = 20.0;
 const FOOD_SCALE_FACTOR: f32 = 0.15;
@@ -39,6 +44,9 @@ const SNAKE_SEGMENT_SCALE_FACTOR: f32 = 0.25;
 const SNAKE_SEGMENT_GAP: f32 = 32.5;
 const SNAKE_DEFAULT_DIRECTION: Vec2 = Vec2::new(1.0, 0.0);
 const SNAKE_DEFAULT_SPEED: f32 = 2.0;
+const SNAKE_DEPTH: f32 = 1.0;
+const FOOD_DEPTH: f32 = 0.5;
+const BACKGROUND_DEPTH: f32 = 0.0;
 
 fn spawn_snake_segment(
     mut commands: Commands,
@@ -53,8 +61,7 @@ fn spawn_snake_segment(
         })
         .insert(SnakeSegment)
         .insert(SnakeMovement {
-            direction: Vec2::ZERO,
-            speed: SNAKE_DEFAULT_SPEED,
+            direction: Vec2::default(),
         })
         .id()
 }
@@ -63,10 +70,11 @@ fn spawn_snake(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     windows: Res<Windows>,
+    mut game_state: ResMut<GameState>,
     mut segments: ResMut<SnakeSegments>,
 ) {
     let window = windows.get_primary().unwrap();
-    let center_vec = Vec3::new(window.width() / 2.0, window.height() / 2.0, 1.0);
+    let center_vec = Vec3::new(window.width() / 2.0, window.height() / 2.0, SNAKE_DEPTH);
 
     let head_transform = Transform {
         scale: Vec3::splat(SNAKE_HEAD_SCALE_FACTOR),
@@ -82,6 +90,10 @@ fn spawn_snake(
 
     tail_transform.translation.x -= 2.0 * SNAKE_SEGMENT_GAP;
 
+    *game_state = GameState {
+        speed: SNAKE_DEFAULT_SPEED,
+    };
+
     *segments = SnakeSegments(vec![
         commands
             .spawn(SpriteBundle {
@@ -90,9 +102,9 @@ fn spawn_snake(
                 ..default()
             })
             .insert(SnakeHead)
+            .insert(SnakeSegment)
             .insert(SnakeMovement {
                 direction: SNAKE_DEFAULT_DIRECTION,
-                speed: SNAKE_DEFAULT_SPEED,
             })
             .id(),
         spawn_snake_segment(commands, asset_server, tail_transform),
@@ -129,25 +141,26 @@ fn snake_head_input(
 }
 
 fn snake_head_movement(
+    game_state: Res<GameState>,
     mut head_positions: Query<(&SnakeHead, &SnakeMovement, &mut Transform)>,
     windows: Res<Windows>,
 ) {
     let window = windows.get_primary().unwrap();
 
     for (_head, movement, mut transform) in head_positions.iter_mut() {
-        transform.translation.x += movement.direction.x * movement.speed;
-        transform.translation.y += movement.direction.y * movement.speed;
+        transform.translation.x += movement.direction.x * game_state.speed;
+        transform.translation.y += movement.direction.y * game_state.speed;
 
-        if transform.translation.x < 0.0 {
-            transform.translation.x = window.width();
-        } else if transform.translation.x > window.width() {
+        if transform.translation.x > window.width() {
             transform.translation.x = 0.0;
+        } else if transform.translation.x < 0.0 {
+            transform.translation.x = window.width();
         }
 
-        if transform.translation.y < 0.0 {
-            transform.translation.y = window.height();
-        } else if transform.translation.y > window.height() {
+        if transform.translation.y > window.height() {
             transform.translation.y = 0.0;
+        } else if transform.translation.y < 0.0 {
+            transform.translation.y = window.height();
         }
     }
 }
@@ -155,6 +168,7 @@ fn snake_head_movement(
 fn food_eaten_event_listener(
     commands: Commands,
     asset_server: Res<AssetServer>,
+    mut game_state: ResMut<GameState>,
     mut food_eaten_events: EventReader<FoodEaten>,
     mut spawn_food_events: EventWriter<SpawnFood>,
     mut segments: ResMut<SnakeSegments>,
@@ -164,10 +178,7 @@ fn food_eaten_event_listener(
         food_eaten_events.clear();
         spawn_food_events.send_default();
 
-        let (_, mut head_movement) = transform_query.get_mut(*segments.first().unwrap()).unwrap();
-        head_movement.speed += SNAKE_SPEED_INCREMENT;
-
-        info!("Snake speed: {}", head_movement.speed);
+        game_state.speed += SNAKE_SPEED_INCREMENT;
 
         let last_segment = segments.last().unwrap();
         let (last_transform, last_movement) = transform_query.get_mut(*last_segment).unwrap();
@@ -210,7 +221,7 @@ fn spawn_food_event_listener(
             .spawn(SpriteBundle {
                 texture: asset_server.load("food.png"),
                 transform: Transform {
-                    translation: Vec3::new(food_x, food_y, 0.5),
+                    translation: Vec3::new(food_x, food_y, FOOD_DEPTH),
                     scale: Vec3::splat(FOOD_SCALE_FACTOR),
                     ..default()
                 },
@@ -220,57 +231,23 @@ fn spawn_food_event_listener(
     }
 }
 
-fn snake_grow(
-    commands: Commands,
-    keyboard_input: Res<Input<KeyCode>>,
-    asset_server: Res<AssetServer>,
-    mut spawn_food_events: EventWriter<SpawnFood>,
-    mut segments: ResMut<SnakeSegments>,
-    transform_query: Query<(&Transform, &SnakeMovement)>,
-) {
-    if keyboard_input.just_pressed(KeyCode::Return) {
-        spawn_food_events.send_default();
-    }
-
-    if keyboard_input.just_pressed(KeyCode::Space) {
-        let last_segment = segments.last().unwrap();
-        let (last_transform, last_movement) = transform_query.get(*last_segment).unwrap();
-
-        segments.push(spawn_snake_segment(
-            commands,
-            asset_server,
-            Transform {
-                scale: Vec3::splat(SNAKE_SEGMENT_SCALE_FACTOR),
-                translation: Vec3::new(
-                    last_transform.translation.x + (-last_movement.direction.x * SNAKE_SEGMENT_GAP),
-                    last_transform.translation.y + (-last_movement.direction.y * SNAKE_SEGMENT_GAP),
-                    1.0,
-                ),
-                ..default()
-            },
-        ))
-    }
-}
-
 fn check_eat_self(
+    mut game_state: ResMut<GameState>,
     mut segments: ResMut<SnakeSegments>,
     mut commands: Commands,
     mut exit: EventWriter<AppExit>,
-    mut head_query: Query<(&Transform, &mut SnakeMovement), With<SnakeHead>>,
     segments_query: Query<&Transform, With<SnakeSegment>>,
 ) {
-    let (head_transform, mut head_movement) = head_query.single_mut();
+    let head_transform = segments_query.iter().next().unwrap();
 
-    for (i, segment_transform) in segments_query.iter().enumerate() {
-        if segment_transform
+    for (i, segment_transform) in segments_query.iter().skip(2).enumerate() {
+        let distance = segment_transform
             .translation
-            .distance(head_transform.translation)
-            <= 10.0
-        {
-            let corresponding_segments = segments.split_off(i);
-            let segments_eaten = corresponding_segments.len();
+            .distance(head_transform.translation);
 
-            info!("You ate yourself! {:?}", corresponding_segments);
+        if distance <= SNAKE_EAT_SELF_DISTANCE {
+            let corresponding_segments = segments.split_off(i + 2);
+            let segments_eaten = corresponding_segments.len();
 
             for entity in corresponding_segments.into_iter() {
                 commands.entity(entity).despawn();
@@ -280,7 +257,7 @@ fn check_eat_self(
                 exit.send(AppExit);
             }
 
-            head_movement.speed -= segments_eaten as f32 * SNAKE_SPEED_INCREMENT;
+            game_state.speed -= segments_eaten as f32 * SNAKE_SPEED_INCREMENT;
         }
     }
 }
@@ -306,32 +283,37 @@ fn check_food_eaten(
 }
 
 fn snake_segments_movement(
+    windows: Res<Windows>,
+    game_state: Res<GameState>,
     segments: Res<SnakeSegments>,
-    mut segments_query: Query<(&mut SnakeMovement, &mut Transform), Without<SnakeHead>>,
-    head_query: Query<(&SnakeMovement, &Transform), With<SnakeHead>>,
+    mut segments_query: Query<(&mut SnakeMovement, &mut Transform), With<SnakeSegment>>,
 ) {
-    let (head_movement, head_transform) = head_query.single();
-
-    let segments_transforms: Vec<Transform> = segments
+    let window = windows.get_primary().unwrap();
+    let transforms: Vec<Transform> = segments
         .iter()
-        .skip(1)
-        .map(|e| -> Transform { *segments_query.get(*e).unwrap().1 })
+        .map(|e| *segments_query.get(*e).unwrap().1)
         .collect();
 
-    for (index, (mut movement, mut transform)) in segments_query.iter_mut().enumerate() {
-        let diff_x;
-        let diff_y;
+    for ((mut movement, mut transform), prev_transform) in
+        segments_query.iter_mut().skip(1).zip(transforms.iter())
+    {
+        let mut diff_x;
+        let mut diff_y;
 
-        if index == 0 {
-            diff_x = head_transform.translation.x - transform.translation.x;
-            diff_y = head_transform.translation.y - transform.translation.y;
-        } else if segments_transforms.len() > 1 {
-            let prev_transform = segments_transforms.get(index - 1).unwrap();
+        diff_x = prev_transform.translation.x - transform.translation.x;
+        if diff_x.abs() >= window.width() - 50.0 {
+            diff_x = match diff_x < 0.0 {
+                true => diff_x + window.width(),
+                false => diff_x - window.width(),
+            }
+        }
 
-            diff_x = prev_transform.translation.x - transform.translation.x;
-            diff_y = prev_transform.translation.y - transform.translation.y;
-        } else {
-            break;
+        diff_y = prev_transform.translation.y - transform.translation.y;
+        if diff_y.abs() >= window.height() - 50.0 {
+            diff_y = match diff_y < 0.0 {
+                true => diff_y + window.height(),
+                false => diff_y - window.height(),
+            };
         }
 
         movement.direction.x = diff_x;
@@ -341,11 +323,21 @@ fn snake_segments_movement(
         let diff_len = Vec2::new(diff_x, diff_y).length();
 
         transform.translation.x +=
-            movement.direction.x * (diff_len / SNAKE_SEGMENT_GAP) * head_movement.speed;
+            movement.direction.x * (diff_len / SNAKE_SEGMENT_GAP) * game_state.speed;
         transform.translation.y +=
-            movement.direction.y * (diff_len / SNAKE_SEGMENT_GAP) * head_movement.speed;
+            movement.direction.y * (diff_len / SNAKE_SEGMENT_GAP) * game_state.speed;
 
-        transform.rotate_z(0.05)
+        if transform.translation.x < 0.0 {
+            transform.translation.x = window.width();
+        } else if transform.translation.x > window.width() {
+            transform.translation.x = 0.0;
+        }
+
+        if transform.translation.y < 0.0 {
+            transform.translation.y = window.height();
+        } else if transform.translation.y > window.height() {
+            transform.translation.y = 0.0;
+        }
     }
 }
 
@@ -378,7 +370,11 @@ fn setup_background(
             mesh: meshes.add(Mesh::from(shape::Quad::default())).into(),
             transform: Transform::default()
                 .with_scale(Vec3::new(window.width(), window.height(), 0.0))
-                .with_translation(Vec3::new(window.width() / 2.0, window.height() / 2.0, 0.0)),
+                .with_translation(Vec3::new(
+                    window.width() / 2.0,
+                    window.height() / 2.0,
+                    BACKGROUND_DEPTH,
+                )),
             material: materials.add(ColorMaterial::from(background_texture)),
             ..default()
         })
@@ -394,6 +390,7 @@ fn initialize_food(mut spawn_food_events: EventWriter<SpawnFood>) {
 fn main() {
     App::new()
         .insert_resource(SnakeSegments::default())
+        .insert_resource(GameState::default())
         .add_event::<SpawnFood>()
         .add_event::<FoodEaten>()
         .add_startup_system(setup_background)
@@ -402,17 +399,12 @@ fn main() {
         .add_startup_system(initialize_food)
         .add_system(snake_head_input)
         .add_system(snake_head_movement)
-        .add_system(snake_segments_movement)
+        .add_system(snake_segments_movement.after(snake_head_movement))
         .add_system(animate_food)
-        .add_system(
-            snake_grow
-                .before(check_eat_self)
-                .after(snake_segments_movement),
-        )
-        .add_system(check_food_eaten)
+        .add_system(check_food_eaten.after(snake_segments_movement))
         .add_system(check_eat_self.after(snake_segments_movement))
         .add_system(spawn_food_event_listener)
-        .add_system(food_eaten_event_listener)
+        .add_system(food_eaten_event_listener.after(snake_segments_movement))
         .add_plugins(DefaultPlugins)
         .run();
 }
