@@ -1,5 +1,8 @@
-use bevy::{app::AppExit, prelude::*, sprite::MaterialMesh2dBundle};
+use bevy::{
+    app::AppExit, prelude::*, sprite::MaterialMesh2dBundle, window::WindowId, winit::WinitWindows,
+};
 use rand::Rng;
+use winit::window::Icon;
 
 #[derive(Component)]
 struct SnakeHead;
@@ -387,12 +390,37 @@ fn initialize_food(mut spawn_food_events: EventWriter<SpawnFood>) {
     }
 }
 
+fn set_window_icon(windows: NonSend<WinitWindows>) {
+    let primary = windows.get_window(WindowId::primary()).unwrap();
+
+    let (icon_rgba, icon_width, icon_height) = {
+        let image = image::open("assets/segment.png")
+            .expect("Failed to open icon path")
+            .into_rgba8();
+        let (width, height) = image.dimensions();
+        let rgba = image.into_raw();
+        (rgba, width, height)
+    };
+
+    let icon = Icon::from_rgba(icon_rgba, icon_width, icon_height).unwrap();
+
+    primary.set_window_icon(Some(icon));
+}
+
 fn main() {
     App::new()
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            window: WindowDescriptor {
+                title: "Snake".to_string(),
+                ..default()
+            },
+            ..default()
+        }))
         .insert_resource(SnakeSegments::default())
         .insert_resource(GameState::default())
         .add_event::<SpawnFood>()
         .add_event::<FoodEaten>()
+        .add_startup_system(set_window_icon)
         .add_startup_system(setup_background)
         .add_startup_system(setup_camera)
         .add_startup_system(spawn_snake)
@@ -405,6 +433,5 @@ fn main() {
         .add_system(check_eat_self.after(snake_segments_movement))
         .add_system(spawn_food_event_listener)
         .add_system(food_eaten_event_listener.after(snake_segments_movement))
-        .add_plugins(DefaultPlugins)
         .run();
 }
