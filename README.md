@@ -33,4 +33,3 @@ Every time you eat, the speed increases. It is possible to eat yourself, which w
 * A way to loose (poisonous food, enemies of some sort, not sure yet)
 * Some nice sounds
 * Display of the score
-* Split in multiple files
