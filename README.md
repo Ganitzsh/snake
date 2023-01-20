@@ -2,7 +2,7 @@
 
 ![Recording of the game](assets/recording.gif)
 
-A simple snake-like "game".
+A simple snake-like "game" using [Bevy](https://bevyengine.org/).
 
 This is part of my journey of learning Rust, trying to get the basics right. I'm also following a very good book, [Rust in Action](https://www.manning.com/books/rust-in-action), which elaborates on advanced concepts and things about the language.
 
