@@ -92,6 +92,7 @@ pub fn register(app: &mut App) -> &mut App {
             SystemSet::new()
                 .label("event_listeners")
                 .with_system(spawn_food_event_listener)
-                .with_system(food_eaten_event_listener),
+                .with_system(food_eaten_event_listener)
+            .after("snake_logic"),
         )
 }

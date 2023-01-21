@@ -1,4 +1,4 @@
-use bevy::prelude::{App, Query, Transform, With};
+use bevy::prelude::{IntoSystemDescriptor, App, Query, Transform, With};
 
 use crate::components::Food;
 
@@ -9,5 +9,5 @@ fn animate_food(mut foods_query: Query<&mut Transform, With<Food>>) {
 }
 
 pub fn register(app: &mut App) -> &mut App {
-    app.add_system(animate_food)
+    app.add_system(animate_food.after("snake_logic"))
 }

@@ -137,6 +137,6 @@ pub fn register(app: &mut App) -> &mut App {
             .with_system(setup_background)
             .with_system(setup_camera)
             .with_system(initialize_food)
-        .with_system(initialize_snake),
+            .with_system(initialize_snake),
     )
 }

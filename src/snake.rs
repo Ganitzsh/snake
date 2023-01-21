@@ -45,6 +45,7 @@ fn snake_segments_movement(
     segments: Res<SnakeSegments>,
     mut segments_query: Query<(&mut SnakeMovement, &mut Transform), With<SnakeSegment>>,
 ) {
+    println!("segments: {:?}", segments.0);
     let window = windows.get_primary().unwrap();
     let transforms: Vec<Transform> = segments
         .iter()
@@ -159,7 +160,7 @@ pub fn register(app: &mut App) -> &mut App {
             .label("snake_logic")
             .with_system(snake_head_movement)
             .with_system(snake_segments_movement.after(snake_head_movement))
-            .with_system(check_food_eaten.after(snake_segments_movement))
+            .with_system(check_food_eaten.after(snake_head_movement))
             .with_system(check_eat_self.after(snake_segments_movement)),
     )
 }
