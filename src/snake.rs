@@ -45,7 +45,6 @@ fn snake_segments_movement(
     segments: Res<SnakeSegments>,
     mut segments_query: Query<(&mut SnakeMovement, &mut Transform), With<SnakeSegment>>,
 ) {
-    println!("segments: {:?}", segments.0);
     let window = windows.get_primary().unwrap();
     let transforms: Vec<Transform> = segments
         .iter()
