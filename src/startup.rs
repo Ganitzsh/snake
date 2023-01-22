@@ -1,14 +1,12 @@
 use bevy::{
     prelude::{
         shape, App, AssetServer, Assets, Camera2dBundle, Commands, Component, EventWriter, Mesh,
-        NonSend, Res, ResMut, SystemSet, Transform, Vec3,
+        Res, ResMut, SystemSet, Transform, Vec3,
     },
     sprite::{ColorMaterial, MaterialMesh2dBundle, SpriteBundle},
     utils::default,
-    window::{WindowId, Windows},
-    winit::WinitWindows,
+    window::Windows,
 };
-use winit::window::Icon;
 
 use crate::{
     components::{SnakeHead, SnakeMovement, SnakeSegment},
@@ -24,23 +22,6 @@ use crate::{
 
 #[derive(Component)]
 struct Background;
-
-fn set_window_icon(windows: NonSend<WinitWindows>) {
-    let primary = windows.get_window(WindowId::primary()).unwrap();
-
-    let (icon_rgba, icon_width, icon_height) = {
-        let image = image::open("assets/segment.png")
-            .expect("Failed to open icon path")
-            .into_rgba8();
-        let (width, height) = image.dimensions();
-        let rgba = image.into_raw();
-        (rgba, width, height)
-    };
-
-    let icon = Icon::from_rgba(icon_rgba, icon_width, icon_height).unwrap();
-
-    primary.set_window_icon(Some(icon));
-}
 
 fn setup_background(
     mut commands: Commands,
@@ -133,7 +114,6 @@ pub fn register(app: &mut App) -> &mut App {
     app.add_startup_system_set(
         SystemSet::new()
             .label("startup")
-            .with_system(set_window_icon)
             .with_system(setup_background)
             .with_system(setup_camera)
             .with_system(initialize_food)
