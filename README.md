@@ -14,7 +14,7 @@ If your environment is setup for rust:
 cargo run
 ```
 
-Otherwise, I will compile it to WebAssembly and host it soon.
+Otherwise, you can play on your browser [here](https://ganitzsh.github.io/snake).
 
 ## Rules
 
